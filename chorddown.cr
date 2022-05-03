@@ -55,10 +55,10 @@ module ChordDown
             s = s.lstrip
             initial = untrimmed_length - s.size
             
-            indices = s
-                .chars
-                .map_with_index{ |c, i| c.uppercase? ? i : -1 }
-                .select{ |c| c != -1 }
+            indices = [] of Int32
+            s.chars.each_with_index do |c,i|
+                indices << i if c.uppercase? && s.chars[i-1]? != '/'
+            end
              
             chords = (0...indices.size).map do |i|
                 slice = s[
@@ -100,6 +100,20 @@ module ChordDown
             @chords = chords
             @text = text
             @length = Math.max(chords.to_s.size, text.size)
+        end
+        
+        def each_segment(&block)
+            chars = @text.chars
+            yield nil, @text[0, @chords.initial] unless @chords.initial == 0
+            i = @chords.initial
+            @chords.data.each do |chord|
+                l = chord.length
+                if l != 0
+                    l = @text.size - i if chord == @chords.data.last
+                    yield chord, @text[i, l]
+                    i += l
+                end
+            end
         end
     end
     

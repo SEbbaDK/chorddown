@@ -107,7 +107,9 @@ module ShenMuse
         end
         
         def transpose(amount)
-            Chord.new (@root.transpose amount), @modifier, @combined
+            c = @combined
+            c = c.as(Note).transpose amount unless c.nil?
+            Chord.new (@root.transpose amount), @modifier, c
         end
     end
 
