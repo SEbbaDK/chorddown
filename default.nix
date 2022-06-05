@@ -5,4 +5,5 @@ in
 {
 	viewer = call ./viewer.nix;
 	scraper = call ./scraper.nix;
+	songbook = call ./songbook.nix;
 }
