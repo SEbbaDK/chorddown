@@ -110,7 +110,11 @@ module ChordDown
                 l = chord.length
                 if l != 0
                     l = @text.size - i if chord == @chords.data.last
-                    yield chord, @text[i, l]
+                    if l > 0
+                        yield chord, @text[i, l]
+                    else
+                        yield chord, ""
+                    end
                     i += l
                 end
             end
