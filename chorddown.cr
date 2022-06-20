@@ -24,15 +24,20 @@ module ChordDown
     class LengthedChord
         getter chord : ShenMuse::Chord
         getter length : Int32
+        getter halfed : Bool # Does it have a dash to next
         
-        def initialize(chord, length)
+        def initialize(chord, length, dashed)
             @chord = chord
             @length = length
+            @halfed = dashed
         end
         
         def to_s
             c = @chord.to_s
             w = " " * Math.max(0, (@length - c.size))
+            if @halfed
+                w.sub(w.size // 2, '-')
+            end
             c + w
         end
         
@@ -69,12 +74,17 @@ module ChordDown
                         indices[i + 1]
                     end - indices[i]
                 ]
+                dashed = false
                 begin
+                    if slice.includes? '-'
+                        dashed = true
+                        slice = slice.sub('-', ' ')
+                    end
                     chord = ShenMuse::Chord.from_s slice.strip
                 rescue ex : ShenMuse::NoteParseException
                     raise LineParseException.new ex.message, slice.strip, s
                 end
-                LengthedChord.new chord, slice.size
+                LengthedChord.new chord, slice.size, dashed
             end
 
             ChordLine.new initial, chords
@@ -110,7 +120,7 @@ module ChordDown
                 l = chord.length
                 if l != 0
                     l = @text.size - i if chord == @chords.data.last
-                    if l > 0
+                    if l > 0 && i < @text.size
                         yield chord, @text[i, l]
                     else
                         yield chord, ""
@@ -172,7 +182,7 @@ module ChordDown
             end
             
             # Read the text lines
-            if ! parsing_data && /^([| \/]|[ABCDEFGH][#a-z0-9]*)+$/ =~ line
+            if ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*)+$/ =~ line
                 # We are looking at a chord line
                 chord_line.try{ |cl| text << cl }
                 chord_line = ChordLine.from_s line
