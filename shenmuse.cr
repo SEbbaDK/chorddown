@@ -23,23 +23,20 @@ module ShenMuse
         def self.from_s(s : String) : Note
             case s
             when "A"  ; A
-            when "A#" ; As
             when "B"  ; B
             when "H"  ; B
             when "C"  ; C
-            when "C#" ; Cs
             when "D"  ; D
-            when "D#" ; Ds
             when "E"  ; E
             when "F"  ; F
-            when "F#" ; Fs
             when "G"  ; G
-            when "G#" ; Gs
             else
                 s[1]?.try do |c|
-                    if c == "b"
-                        r = Note.from_s s[0].to_s
-                        return r.transpose(-1)
+                    root = Note.from_s s[0].to_s
+                    if c == '#'
+                        return root.transpose(1)
+                    elsif c == 'b'
+                        return root.transpose(-1)
                     end
                 end
                 raise NoteParseException.new s
@@ -90,7 +87,7 @@ module ShenMuse
                 Chord.new root.root, root.modifier, bass.root
             else
                 root_length = 1
-                root_length = 2 if s[1]? == '#'
+                root_length = 2 if s[1]? == '#' || s[1]? == 'b'
                 
                 root = Note.from_s s[0, root_length]
                 modifier = s.delete_at 0, root_length
