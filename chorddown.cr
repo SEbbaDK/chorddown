@@ -1,5 +1,23 @@
 require "./shenmuse"
 
+def numerals(s)
+    case s.strip.downcase
+    when "i"   ; 1
+    when "ii"  ; 2
+    when "iii" ; 3
+    when "iv"  ; 4
+    when "v"   ; 5
+    when "vi"  ; 6
+    when "vii" ; 7
+    else raise "Cannot parse roman numeral: #{s}"
+    end
+end
+
+def atlist(s)
+    return [] of String if s.nil?
+    s.to_s.split('&').map &.strip
+end
+
 module ChordDown
     
     class InvalidOptionException < Exception
@@ -131,17 +149,19 @@ module ChordDown
         end
     end
     
-    class ChordFile
-        getter data : Hash(String, String | Int32)
-        getter text : Array(String | ChordLine | ChordedLine)
+    class Section
+        getter name : String | Nil
+        getter number : Int32 | Nil
+        getter data : Array(String | ChordLine | ChordedLine)
         
-        def initialize(data, text)
-            @data = data
-            @text = text
+        def initialize(name, number, data)
+            @name   = name 
+            @number = number 
+            @data   = data 
         end
         
         def transpose(amount)
-            @text.each do |t|
+            @data.each do |t|
                 if t.is_a? ChordLine
                     t.transpose amount
                 elsif t.is_a? ChordedLine
@@ -150,14 +170,34 @@ module ChordDown
             end
         end
     end
+    
+    class ChordFile
+        getter data : Hash(String, String | Int32)
+        getter sections : Array(Section)
+        getter title : String
+        getter artists : Array(String)
+        
+        def initialize(@data, @sections, @title, @artists)
+        end
+        
+        def transpose(amount)
+            @sections.each do |s|
+                s.transpose amount
+            end
+        end
+    end
 
     def self.load(file : Path | String)
         file = Path.new file if file.is_a? String
         
+        artist = [] of String
         data = Hash(String, String | Int32).new
         l = 0
         parsing_data = true
         chord_line = nil
+        secname = ""
+        secnum = nil
+        sections = [] of Section
         text = [] of String | ChordedLine | ChordLine
         # Go through file line by line
         File.each_line file do |line|
@@ -173,26 +213,58 @@ module ChordDown
                     raise InvalidOptionException.new l, line
                 end
             else
-                [ "TITLE", "ARTIST" ].each do |required_option|
+                [ "TITLE" ].each do |required_option|
                     data.fetch required_option do 
                         raise MissingOptionException.new required_option
                     end
+                end
+                [ "ARTIST", "LYRICS", "MELODY" ].each do |t|
+                    if data[t]?.is_a? Int32
+                        raise Exception.new "Tag #{t} should be a string (value was #{data[t]})"
+                    end
+                end
+                artist = atlist data["ARTIST"]?
+                if artist.empty?
+                    artist = atlist(data["LYRICS"]?) + atlist(data["MELODY"]?)
+                	if artist.empty?
+                        raise MissingOptionException.new "ARTIST or LYRICS/MELODY"
+                	end
+                else
+                   	if data.has_key? "LYRICS" || data.has_key? "MELODY"
+                        raise Exception.new "Either specify ARTIST or LYRICS/MELODY"
+                   	end
                 end
                 parsing_data = false
             end
             
             # Read the text lines
-            if ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*)+$/ =~ line
+            header_match = /^\[?([a-zA-ZæøåÆØÅ -]+)( [0-9]+)?( [IViv]+)?[\]:][ ]*$/.match line
+            if ! parsing_data && header_match
+                chord_line = nil
+                unless text.empty?
+                    sections << Section.new secname, secnum, text
+                    text = [] of String | ChordedLine | ChordLine
+                end
+                secname = header_match[1]
+                num = header_match[2]?
+                unless num.nil?
+					secnum = num.strip.to_i                    
+                end
+            elsif ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*)+$/ =~ line
                 # We are looking at a chord line
                 chord_line.try{ |cl| text << cl }
                 chord_line = ChordLine.from_s line
             elsif ! parsing_data
                 # We are looking at some other line
                 if ! chord_line.nil?
-                    text << ChordedLine.new chord_line, line
+                    if line.blank?
+                        text << chord_line
+                    else
+                        text << ChordedLine.new chord_line, line
+                    end
                     chord_line = nil
                 else
-                    text << line
+                    text << line unless line.blank?
                 end
             end
         end
@@ -201,7 +273,9 @@ module ChordDown
             text << chord_line.to_s + "\n"
         end
         
-        ChordFile.new data, text
+        sections << Section.new secname, secnum, text
+        
+        ChordFile.new data, sections, data["TITLE"].to_s, artist
     end
 
 end
