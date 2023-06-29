@@ -9,12 +9,12 @@ end
 if [ ! -z "$argv[3]" ]
     echo "RUNNING IN EXCEPT MODE"
     echo "Finding sources"
-    set sources (rg "SOURCE: ([a-z0-9.:/-]+)" --replace '$1' --no-filename)
+    set sources (rg "SOURCE: ([a-z0-9.:/-]+)" --replace '$1' --no-filename "$argv[3]")
     echo "Sources found"
 end
 
 echo "Extracting tabs"
-for t in (pcregrep --buffer-size=1000000 -o1 'https://tabs\.ultimate-guitar\.com/tab/([^\"]*)' $argv[1])
+for t in (pcregrep --buffer-size=1000000 -o1 'https://tabs\.ultimate-guitar\.com/tab/([^\"&]*)' $argv[1])
 	echo "Found tab: $t"
 
 	if contains "https://tabs.ultimate-guitar.com/tab/$t" $sources

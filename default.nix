@@ -1,9 +1,9 @@
 { pkgs ? import <nixpkgs> {} }:
 let
-	call = file: (import file) { inherit pkgs; };
+    call = file: (import file) { inherit pkgs; };
 in
 {
-	viewer = call ./viewer.nix;
-	scraper = call ./scraper.nix;
-	songbook = call ./songbook.nix;
+    viewer = call ./viewer.nix;
+    scraper = call ./scraper.nix;
+    songbook = call ./songbook.nix;
 }
