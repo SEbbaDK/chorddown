@@ -1,0 +1,12 @@
+name: chorddown-browser
+version: 0.1.0
+
+dependencies:
+   crysterm:
+    github: crystallabs/crysterm
+    branch: master
+
+targets:
+    chorddown-browser:
+        main: ./chorddown-browser.cr
+

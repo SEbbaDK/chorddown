@@ -80,7 +80,7 @@ module ChordDown
             
             indices = [] of Int32
             s.chars.each_with_index do |c,i|
-                indices << i if c.uppercase? && s.chars[i-1]? != '/'
+                indices << i if c.uppercase? && s.chars[i-1]? != '/' #/ this is just to fix kakounes rendering
             end
              
             chords = (0...indices.size).map do |i|
@@ -148,11 +148,13 @@ module ChordDown
             end
         end
     end
-    
+
+	alias SectionLine = String | ChordLine | ChordedLine
+
     class Section
         getter name : String | Nil
         getter number : Int32 | Nil
-        getter data : Array(String | ChordLine | ChordedLine)
+        getter data : Array(SectionLine)
         
         def initialize(name, number, data)
             @name   = name 
@@ -176,6 +178,7 @@ module ChordDown
         getter sections : Array(Section)
         getter title : String
         getter artists : Array(String)
+        getter key_change : Int32 = 0
         
         def initialize(@data, @sections, @title, @artists)
         end
@@ -184,6 +187,7 @@ module ChordDown
             @sections.each do |s|
                 s.transpose amount
             end
+            @key_change += amount
         end
     end
 
@@ -250,7 +254,7 @@ module ChordDown
                 unless num.nil?
 					secnum = num.strip.to_i                    
                 end
-            elsif ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*)+$/ =~ line
+            elsif ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*\**)+$/ =~ line
                 # We are looking at a chord line
                 chord_line.try{ |cl| text << cl }
                 chord_line = ChordLine.from_s line
