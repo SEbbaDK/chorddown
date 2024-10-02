@@ -73,39 +73,8 @@ def len(s : String | Colorize::Object(String))
     s.size
 end
 
-if ENV.has_key?("SCREENSIZE")
-    width, height = ENV["SCREENSIZE"].split(",").map { |s| s.to_i }
-    remaining = height
-    base = 0
-    max_width = 0
-    current_line = 0
-    lines = (1..height).map { |_| "" }
-    lines_size = lines.map { |_| 0 }
-    secs.each do |s|
-        if s.size > remaining
-            base = base + max_width
-            max_width = 0
-            lines.each_index do |i|
-                lines[i] = pad(lines[i], lines_size[i], base)
-            end
-			current_line = 1
-        end
-    	s.each do |l|
-        	w = raw(l).size
-        	max_width = w if w > max_width
-        	lines[current_line] += l.to_s
-        	lines_size[current_line] += w
-        	current_line += 1
-        	remaining -= 1
-    	end
-    	current_line += 1
-        remaining -= 1
-    end
-    lines.each { |l| puts l }
-else
-    secs.each do |s|
-        s.each { |l| puts l }
-    end
+secs.each do |s|
+    s.each { |l| puts l }
 end
 
 exit 0
