@@ -6,6 +6,9 @@ module ShenMuse
         end
     end
     
+    class ModifierParseException < Exception
+    end
+    
     enum Note
         A
         As
@@ -88,9 +91,11 @@ module ShenMuse
             else
                 root_length = 1
                 root_length = 2 if s[1]? == '#' || s[1]? == 'b'
-                
                 root = Note.from_s s[0, root_length]
-                modifier = s.delete_at 0, root_length
+                modifier = s[root_length, s.size - 1]
+                if modifier.includes? ' '
+                    raise ModifierParseException.new "Space found in modifier »#{modifier}« while parsing note »#{s}«"
+                end
                 Chord.new root, modifier
             end
         end

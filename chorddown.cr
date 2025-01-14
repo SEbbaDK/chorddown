@@ -34,8 +34,11 @@ module ChordDown
     end
     
     class LineParseException < Exception
-        def initialize(reason, slice, line)
-            super("#{reason}\nWhile parsing »#{slice}«\nIn line »#{line}«")
+        def initialize(reason : String, slice = nil, line = nil)
+            s = reason
+            s += "\nWhile parsing »#{slice}«" if slice != nil
+            s += "\nIn line »#{line}«" if line != nil
+            super(s)
         end
     end
     
@@ -100,9 +103,13 @@ module ChordDown
                     end
                     chord = ShenMuse::Chord.from_s slice.strip
                 rescue ex : ShenMuse::NoteParseException
-                    raise LineParseException.new ex.message, slice.strip, s
+                    raise LineParseException.new ex.message.to_s, slice.strip, s
                 end
                 LengthedChord.new chord, slice.size, dashed
+            end
+
+            if chords.size == 0
+				raise LineParseException.new "No chords found", line = s
             end
 
             ChordLine.new initial, chords
@@ -242,7 +249,7 @@ module ChordDown
             end
             
             # Read the text lines
-            header_match = /^\[?([a-zA-ZæøåÆØÅ -]+)( [0-9]+)?( [IViv]+)?[\]:][ ]*$/.match line
+            header_match = /^\[([^\n]+)\]$|^(\S+(?:\s+\d+)?):$/.match line
             if ! parsing_data && header_match
                 chord_line = nil
                 unless text.empty?
@@ -254,7 +261,7 @@ module ChordDown
                 unless num.nil?
 					secnum = num.strip.to_i                    
                 end
-            elsif ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9]*\**)+$/ =~ line
+            elsif ! parsing_data && /^([| \/]|[ -]*[ABCDEFGH][#a-z0-9()]*\**)+$/ =~ line
                 # We are looking at a chord line
                 chord_line.try{ |cl| text << cl }
                 chord_line = ChordLine.from_s line
