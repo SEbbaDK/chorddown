@@ -59,9 +59,11 @@ paths.each do |path|
 end
 
 files = Hash(String, ChordDown::ChordFile | ChordFileError).new
+file_paths = Hash(ChordDown::ChordFile | ChordFileError, String).new
 (1..paths.size).each do |_|
 	result = channel.receive
 	files[result[:path]] = result[:result]
+	file_paths[result[:result]] = result[:path]
 end
 
 # files.each do |p, r|
@@ -208,6 +210,7 @@ class SectionViewer < Crysterm::Widget::Box
 
 	def setup_sections(song)
 		@current_section = 0
+		@child_base = 0
 		@sections.clear
 		song.sections.each do |s|
     		t = [] of String
@@ -372,15 +375,17 @@ class ChorddownBrowser
         	s.render
     	elsif e.char == 'a'
         	songlist.chord_files.sort! do |a,b|
-            	a.artists.join <=> b.artists.join
+            	a.artists.join.downcase <=> b.artists.join.downcase
         	end
         	songlist.setup_items
+        	songlist.select_top
         	s.render
     	elsif e.char == 't'
         	songlist.chord_files.sort! do |a,b|
-            	a.title <=> b.title
+            	a.title.downcase <=> b.title.downcase
         	end
         	songlist.setup_items
+        	songlist.select_top
         	s.render
     	end
 	end
