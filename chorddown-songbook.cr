@@ -1,153 +1,74 @@
 #!/usr/bin/env crystal
 
 require "colorize"
+require "option_parser"
 
 require "./chorddown"
+require "./chorddown-songbook-latex"
+require "./chorddown-songbook-typst"
+
+enum Format
+  Latex
+  Typst
+
+  def self.from_s(str)
+    if str =~ /l(atex)?/
+      return Latex
+    elsif str =~ /t(ypst)?/
+      return Typst
+    end
+    raise Exception.new "No format that matches »#{str}«"
+  end
+end
+
+format = Format::Latex
+
+text_only = false
+
+parser = OptionParser.new do |parser|
+  parser.banner = "USAGE: chorddown-songbook [OPTIONS] FILE"
+
+  parser.on "-f FORMAT", "--format=FORMAT", "Select format ( latex / typst )" do |_format|
+    format = Format.from_s _format
+  end
+
+  parser.on "-t", "--text-only", "Only print the lyrics and no chords" do
+    text_only = true
+  end
+
+  parser.on "-h", "--help", "Show help" do
+    puts parser
+    exit
+  end
+end
+
+parser.parse
 
 if ARGV[0]?.nil?
-    STDERR.puts "Need to give input file as first argument".colorize(:red)
-    exit 1
+  STDERR.puts "Need to give input FILE argument".colorize(:red)
+  puts parser
+  exit 1
 end
 
-TEXTMODE = (ARGV[1]? == "text")
+songbook_path = Path.new ARGV[0]
 
-def clean(string)
-    string.gsub('[', " {[").gsub(']', "]}").gsub('#', "\\#")
-    #.gsub(/\(([^\)]+)\)/) do |s|
-    #    "\\textit{" + s.delete_at(0).delete_at(-1) + "}"
-    #end
-end
+writer = LatexSongWriter.new text_only if format == Format::Latex
+writer = TypstSongWriter.new text_only if format == Format::Typst
 
-def cclean(string)
-    clean(string.gsub('#', "$\\sharp$").gsub('b', "$\\flat$"))
-end
+writer = writer.not_nil!
 
-def chord(chord : ChordDown::LengthedChord)
-    c = chord.chord
-    output = "\\chordroot{" + cclean(c.root.to_s) + "}"
-    output += "\\chordmod{#{c.modifier}}" unless c.modifier.empty?
-    output += "\\!\\textfractionsolidus\\!#{cclean(c.combined.to_s.downcase)}" unless c.combined.nil?
-    output + "\\ "
-end
+writer.write_header
 
-def printsong(song)
+File.read_lines(songbook_path).each do |line|
+  if line[0]? == '@'
     begin
-        file = ChordDown.load song
+      file = ChordDown.load(songbook_path.parent / line[1..])
+      writer.write_song file
     rescue ex : ChordDown::MissingOptionException | ChordDown::InvalidOptionException
-        STDERR.puts ex.message.colorize(:red)
-        exit 2
+      STDERR.puts ex.message.colorize(:red)
+      exit 2
     end
-
-    title = file.title
-    artist = file.artists.join(" \\& ")
-    capo = file.data["CAPO"]?
-    comment = file.data["COMMENT"]?
-    
-    file.transpose(capo.to_i) if capo
-    
-    puts "\\renewcommand{\\songtitle}{#{title}}"
-    puts "\\renewcommand{\\songartist}{#{artist}}"
-    puts "\\renewcommand{\\songcomment}{}"
-    puts "\\renewcommand{\\songcomment}{#{comment}}" if comment
-    puts "\\renewcommand{\\songcapo}{}"
-    puts "\\renewcommand{\\songcapo}{#{capo}}" if capo
-    puts "{\\presong %"
-    
-    file.sections.each do |section|
-        if /Tabs/i =~ section.name
-            next
-        end
-        if /Chords|Solo|Link|Intro|Outro|Instrumental/i =~ section.name && TEXTMODE
-            next
-        end
-        sectext = ""
-        section.data.each do |line|
-            if line.is_a? String
-                if line.blank?
-                    sectext += "\n"
-                else
-                    sectext += clean(line) + " \\newline\n"
-                end
-            elsif line.is_a? ChordDown::ChordedLine
-                output = ""
-                line.each_segment do |chord, text|
-                    if TEXTMODE || chord.nil?
-                        output += clean(text)
-                    else
-                        if text.blank?
-                            output += "\\postack{#{chord(chord)}}"
-                        else
-                            output += "\\instack{#{chord(chord)}}" + clean(text)
-                        end
-                    end
-                end
-                sectext += output + " {} \\newline\n" unless output.blank?
-            elsif line.is_a? ChordDown::ChordLine && ! TEXTMODE
-                line.data.each do |lc|
-                    sectext += chord(lc)
-                end
-        		sectext += "\\newline\n"
-            end
-        end
-        # Chop off last newline
-        if sectext.includes? "\\newline"
-            sectext.rindex("\\newline").try do |i|
-                sectext = sectext.sub(i.., "")
-            end
-        end
-        if /^Chorus|Omkvæd|Refrain$/ =~ section.name
-            printf "{\\chorusformat " + sectext.squeeze('\n') + "}\n\n"
-        else
-            printf "{\\verseformat " + sectext.squeeze('\n') + "}\n\n"
-        end
-    end
-    
-    puts "\\postsong}"
+  else
+    puts line
+  end
 end
-
-puts "\\documentclass{book}
-\\usepackage[utf8]{inputenc}
-\\usepackage{parskip,textcomp}
-
-\\usepackage{stackengine}
-\\newcommand{\\instack}[2]{\\stackengine{\\stackgap}{\\vphantom{M}#2}{#1}{O}{l}{F}{T}{S}}
-\\newcommand{\\postack}[1]{\\stackengine{\\stackgap}{\\vphantom{M}}{#1}{O}{l}{F}{F}{S}}
-\\newcommand{\\chordroot}[1]{\\textup{\\textsf{#1}}}
-\\newcommand{\\chordmod}[1]{\\raisebox{0.3\\baselineskip}{\\scriptsize{#1}}}
-
-% Stops paragraphs from being broken
-\\widowpenalties 1 10000
-\\raggedbottom
-
-\\newcommand{\\presong}{}
-\\newcommand{\\postsong}{}
-\\newcommand{\\chorusformat}{}
-\\newcommand{\\verseformat}{}
-\\newcommand{\\iftextmode}[1]{}
-\\newcommand{\\unlesstextmode}[1]{#1}
-
-\\newcommand{\\songtitle}{}
-\\newcommand{\\songartist}{}
-\\newcommand{\\songcomment}{}
-\\newcommand{\\songcapo}{}
-"
-
-puts "\\renewcommand{\\iftextmode}[1]{#1}" if TEXTMODE
-puts "\\renewcommand{\\unlesstextmode}[1]{}" if TEXTMODE
-
-songbookfile = Path.new ARGV[0]
-songbook = File.read(songbookfile)
-
-puts "\\begin{document}" unless songbook.includes? "---SONGBOOK---"
-
-songbook.lines.each do |l|
-    if l == "---SONGBOOK---"
-        puts "\\begin{document}"
-    elsif l[0]? == '#'
-        printsong(Path[songbookfile.dirname] / l.lchop)
-    else
-        puts l
-    end
-end
-
-puts "\\end{document}"
